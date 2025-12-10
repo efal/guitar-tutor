@@ -1,7 +1,15 @@
 [build]
-  publish = "."
-  command = "echo 'No build step required'"
+  command = "npm run build"
+  publish = "dist"
 
+# Wichtig für Single Page Apps (React):
+# Leitet alle Anfragen an index.html weiter, damit React das Routing übernimmt.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Verhindert Caching für den Service Worker, damit Updates sofort erkannt werden.
 [[headers]]
   for = "/sw.js"
   [headers.values]
