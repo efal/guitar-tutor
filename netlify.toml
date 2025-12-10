@@ -2,14 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
-# Wichtig für Single Page Apps (React):
-# Leitet alle Anfragen an index.html weiter, damit React das Routing übernimmt.
+# Redirect all traffic to index.html for React Router (SPA)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Verhindert Caching für den Service Worker, damit Updates sofort erkannt werden.
+# Disable caching for service worker to ensure updates are found
 [[headers]]
   for = "/sw.js"
   [headers.values]
