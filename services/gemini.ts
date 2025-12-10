@@ -1,68 +1,71 @@
+import { GoogleGenAI, Type } from "@google/genai";
 import { PracticeRoutine } from "../types";
 
-// Local Mock Service - No API Key required
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generatePracticeRoutine = async (
   level: string,
   duration: number,
   focus: string
 ): Promise<PracticeRoutine> => {
-  // Simulate processing time
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  const prompt = `Create a guitar practice routine for a ${level} level player focusing on ${focus}. 
+  The total duration should be approximately ${duration} minutes. 
+  Include a breakdown of practice items.`;
 
-  // Generate a plausible routine based on inputs
-  const items = [
-    {
-      title: "Warm-up: Chromatics",
-      durationMinutes: Math.max(2, Math.floor(duration * 0.15)),
-      description: "Play chromatic scales (1-2-3-4) on each string. Focus on alternate picking and minimizing finger movement.",
-      category: "warmup" as const
-    },
-    {
-      title: `${focus} Drills`,
-      durationMinutes: Math.floor(duration * 0.5),
-      description: `Dedicated exercises for ${focus}. Ensure you are using a metronome starting at a comfortable speed.`,
-      category: "technique" as const
-    },
-    {
-      title: "Musical Application",
-      durationMinutes: Math.floor(duration * 0.2),
-      description: `Apply your ${focus} skills to a backing track or a song section you are learning.`,
-      category: "repertoire" as const
-    },
-    {
-      title: "Cool Down",
-      durationMinutes: Math.max(2, Math.floor(duration * 0.15)),
-      description: "Gentle finger stretches and open chord strumming to relax the hand muscles.",
-      category: "cool-down" as const
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          totalDuration: { type: Type.NUMBER },
+          items: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                durationMinutes: { type: Type.NUMBER },
+                description: { type: Type.STRING },
+                category: { 
+                  type: Type.STRING,
+                  enum: ['warmup', 'technique', 'repertoire', 'theory', 'cool-down'],
+                  description: "Must be one of: warmup, technique, repertoire, theory, cool-down"
+                }
+              },
+              required: ['title', 'durationMinutes', 'description', 'category']
+            }
+          }
+        },
+        required: ['title', 'totalDuration', 'items']
+      }
     }
-  ];
+  });
 
-  // Adjust total duration to match request roughly
-  const calculatedTotal = items.reduce((acc, item) => acc + item.durationMinutes, 0);
-
-  return {
-    title: `${level} ${focus} Routine`,
-    totalDuration: calculatedTotal,
-    items: items
-  };
+  if (response.text) {
+    return JSON.parse(response.text) as PracticeRoutine;
+  }
+  
+  throw new Error("Failed to generate routine");
 };
 
 export const chatWithTutor = async (history: {role: 'user' | 'model', text: string}[], message: string): Promise<string> => {
-  // Simulate processing time
-  await new Promise(resolve => setTimeout(resolve, 800));
+  const chatHistory = history.map(msg => ({
+    role: msg.role,
+    parts: [{ text: msg.text }]
+  }));
 
-  const lowerMsg = message.toLowerCase();
-  
-  if (lowerMsg.includes('scale')) {
-      return "Scales are fundamental! For beginners, I recommend starting with the Minor Pentatonic. Would you like to see a diagram?";
-  }
-  if (lowerMsg.includes('chord')) {
-      return "Chords build the harmony. Make sure you're arching your fingers so you don't mute adjacent strings.";
-  }
-  if (lowerMsg.includes('tune') || lowerMsg.includes('tuning')) {
-      return "Tuning is essential. Use the 'Tools' tab (coming soon) or an external tuner to get to E Standard (E A D G B E).";
-  }
+  const chat = ai.chats.create({
+    model: 'gemini-2.5-flash',
+    history: chatHistory,
+    config: {
+        systemInstruction: "You are Strum, a helpful and encouraging guitar tutor. Keep answers concise and focused on guitar playing, music theory, and practice habits."
+    }
+  });
 
-  return "I'm running in offline mode, so my AI brain is resting. Keep practicing your basics! Focus on timing and clean execution.";
+  const result = await chat.sendMessage({ message });
+  return result.text || "I'm having trouble thinking of a response right now.";
 };
